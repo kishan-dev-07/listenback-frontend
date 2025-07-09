@@ -84,6 +84,28 @@ export const AuthProvider = ({ children }) => {
     return { error };
   };
 
+  const updateProfile = async (profileData) => {
+    setLoading(true);
+    setError(null);
+
+    if (!user) {
+      setError('User not authenticated');
+      setLoading(false);
+      return { success: false, error: 'User not authenticated' };
+    }
+    
+    const { success, profile, error } = await authService.updateUserProfile(user.uid, profileData);
+    
+    if (success && profile) {
+      setUserProfile(profile);
+    } else {
+      setError(error);
+    }
+    
+    setLoading(false);
+    return { success, error };
+  };
+
   const value = {
     user,
     userProfile,
@@ -92,6 +114,7 @@ export const AuthProvider = ({ children }) => {
     register,
     login,
     logout,
+    updateProfile,
     isAuthenticated: !!user,
     isTeacher: userProfile?.role === 'teacher',
     isStudent: userProfile?.role === 'student'

@@ -72,5 +72,26 @@ export const authService = {
     } catch (error) {
       return { profile: null, error: error.message };
     }
+  },
+
+  // Update user profile in Firestore
+  async updateUserProfile(uid, profileData) {
+    try {
+      const docRef = doc(db, 'users', uid);
+      
+      // Update the document with new profile data
+      await updateDoc(docRef, {
+        ...profileData,
+        updatedAt: serverTimestamp()
+      });
+
+      // Get the updated profile
+      const { profile } = await this.getUserProfile(uid);
+      
+      return { success: true, profile, error: null };
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      return { success: false, profile: null, error: error.message };
+    }
   }
 };

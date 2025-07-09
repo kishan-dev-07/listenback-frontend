@@ -54,7 +54,7 @@ export default function Navbar() {
           </div>
 
           {/* Profile Dropdown */}
-          <div className="flex items-center">
+          <div className="flex items-center cursor-pointer">
             <div className="relative">
               <button 
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
