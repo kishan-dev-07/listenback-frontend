@@ -67,17 +67,30 @@ export default function LectureView() {
     if (!video) return;
 
     const updateTime = () => setCurrentTime(video.currentTime);
-    const updateDuration = () => setDuration(video.duration);
+    const updateDuration = () => {
+      if (video.duration && !isNaN(video.duration)) {
+        setDuration(video.duration);
+      }
+    };
     const handleLoadedData = () => setIsVideoLoaded(true);
+    const handlePlay = () => setIsPlaying(true);
+    const handlePause = () => setIsPlaying(false);
+    const handleLoadStart = () => setIsVideoLoaded(false);
     
     video.addEventListener('timeupdate', updateTime);
     video.addEventListener('loadedmetadata', updateDuration);
     video.addEventListener('loadeddata', handleLoadedData);
+    video.addEventListener('play', handlePlay);
+    video.addEventListener('pause', handlePause);
+    video.addEventListener('loadstart', handleLoadStart);
     
     return () => {
       video.removeEventListener('timeupdate', updateTime);
       video.removeEventListener('loadedmetadata', updateDuration);
       video.removeEventListener('loadeddata', handleLoadedData);
+      video.removeEventListener('play', handlePlay);
+      video.removeEventListener('pause', handlePause);
+      video.removeEventListener('loadstart', handleLoadStart);
     };
   }, [lecture]);
 
@@ -109,7 +122,7 @@ export default function LectureView() {
 
     document.addEventListener('keydown', handleKeyPress);
     return () => document.removeEventListener('keydown', handleKeyPress);
-  }, [lecture, downloading, sharing]);
+  }, [lecture, downloading, sharing, isPlaying]); // Added isPlaying dependency
 
   const fetchData = async () => {
     try {
@@ -131,33 +144,39 @@ export default function LectureView() {
     }
   };
 
-  const togglePlayPause = () => {
+  const togglePlayPause = async () => {
     const video = videoRef.current;
     if (!video) return;
 
-    if (isPlaying) {
-      video.pause();
-    } else {
-      video.play();
+    try {
+      if (isPlaying) {
+        video.pause();
+      } else {
+        await video.play();
+      }
+    } catch (error) {
+      console.error('Error toggling play/pause:', error);
     }
-    setIsPlaying(!isPlaying);
   };
 
   const handleSeek = (time) => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || !duration) return;
     
-    video.currentTime = time;
-    setCurrentTime(time);
+    const seekTime = Math.max(0, Math.min(time, duration));
+    video.currentTime = seekTime;
+    setCurrentTime(seekTime);
   };
 
   const handleVolumeChange = (newVolume) => {
     const video = videoRef.current;
     if (!video) return;
     
-    video.volume = newVolume;
-    setVolume(newVolume);
-    setIsMuted(newVolume === 0);
+    const volume = Math.max(0, Math.min(1, newVolume)); // Ensure volume is between 0 and 1
+    video.volume = volume;
+    setVolume(volume);
+    setIsMuted(volume === 0);
+    video.muted = volume === 0;
   };
 
   const toggleMute = () => {
@@ -165,17 +184,19 @@ export default function LectureView() {
     if (!video) return;
     
     if (isMuted) {
-      video.volume = volume;
+      video.volume = volume > 0 ? volume : 0.5; // Restore previous volume or set to 50%
+      video.muted = false;
       setIsMuted(false);
     } else {
       video.volume = 0;
+      video.muted = true;
       setIsMuted(true);
     }
   };
 
   const skip = (seconds) => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || !duration) return;
     
     const newTime = Math.max(0, Math.min(duration, currentTime + seconds));
     video.currentTime = newTime;
@@ -393,17 +414,13 @@ export default function LectureView() {
                 ref={videoRef}
                 className="w-full aspect-video"
                 src={lecture?.media_url}
-                onPlay={() => setIsPlaying(true)}
-                onPause={() => setIsPlaying(false)}
-                onMouseMove={() => setShowControls(true)}
-                onMouseLeave={() => setShowControls(false)}
               >
                 Your browser does not support the video tag.
               </video>
               
               {/* Custom Video Controls */}
               {isVideoLoaded && (
-                <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4 transition-opacity ${showControls ? 'opacity-100' : 'opacity-0'}`}>
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4">
                   {/* Progress Bar */}
                   <div className="mb-4">
                     <input
@@ -413,6 +430,9 @@ export default function LectureView() {
                       value={currentTime}
                       onChange={(e) => handleSeek(parseFloat(e.target.value))}
                       className="w-full h-1 bg-white/30 rounded-lg appearance-none cursor-pointer slider"
+                      style={{
+                        background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((currentTime / duration) * 100) || 0}%, rgba(255,255,255,0.3) ${((currentTime / duration) * 100) || 0}%, rgba(255,255,255,0.3) 100%)`
+                      }}
                     />
                   </div>
                   
